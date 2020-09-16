@@ -5,55 +5,77 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using IAtecAPI.Context;
 using IAtecAPI.Models;
-using Microsoft.AspNetCore.Cors;
 
 namespace IAtecAPI.Controllers
 {
     [Route("api/[controller]")]
-    [EnableCors()]
     [ApiController]
     public class PessoasController : ControllerBase
     {
-        private readonly PessoaContext _context;
+        private readonly IatecContext _context;
 
-        public PessoasController(PessoaContext context)
+        public PessoasController(IatecContext context)
         {
             _context = context;
         }
 
+        // GET: api/Pessoas
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Pessoa>>> GetPessoas()
+        public async Task<ActionResult<IEnumerable<Pessoas>>> GetPessoas()
         {
-            //Response.Headers.Add("Access-Control-Allow-Origin", "*");
             return await _context.Pessoas.ToListAsync();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Pessoa>> GetPessoa(int id)
+        [HttpGet("details")]
+        public async Task<ActionResult<IEnumerable<Pessoas>>> GetPessoasDetails()
         {
-            var pessoa = await _context.Pessoas.FindAsync(id);
+            return await _context.Pessoas
+                 .AsNoTracking()
+                 .AsQueryable()
+                 .Include(m => m.Telefones)
+                 .ToListAsync();
+        }
 
-            if (pessoa == null)
+        [HttpGet("{id}/details")]
+        public async Task<ActionResult<Pessoas>> GetPessoasDetails(int id)
+        {
+            var pessoas = await _context.Pessoas.Include(m => m.Telefones).Where(pub => pub.Id == id).FirstOrDefaultAsync();
+
+            if (pessoas == null)
             {
                 return NotFound();
             }
 
-            return pessoa;
+            return pessoas;
         }
 
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutPessoa(int id, [FromBody] Pessoa pessoa)
+        // GET: api/Pessoas/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Pessoas>> GetPessoas(int id)
         {
+            var pessoas = await _context.Pessoas.FindAsync(id);
 
-            if (id != pessoa.id)
+            if (pessoas == null)
+            {
+                return NotFound();
+            }
+
+            return pessoas;
+        }
+
+        // PUT: api/Pessoas/5
+        // To protect from overposting attacks, enable the specific properties you want to bind to, for
+        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutPessoas(int id, Pessoas pessoas)
+        {
+            if (id != pessoas.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(pessoa).State = EntityState.Modified;
+            _context.Entry(pessoas).State = EntityState.Modified;
 
             try
             {
@@ -61,7 +83,7 @@ namespace IAtecAPI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!PessoaExists(id))
+                if (!PessoasExists(id))
                 {
                     return NotFound();
                 }
@@ -74,33 +96,37 @@ namespace IAtecAPI.Controllers
             return NoContent();
         }
 
+        // POST: api/Pessoas
+        // To protect from overposting attacks, enable the specific properties you want to bind to, for
+        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPost]
-        public async Task<ActionResult<Pessoa>> PostPessoa(Pessoa pessoa)
+        public async Task<ActionResult<Pessoas>> PostPessoas(Pessoas pessoas)
         {
-            _context.Pessoas.Add(pessoa);
+            _context.Pessoas.Add(pessoas);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetPessoa", new { id = pessoa.id }, pessoa);
+            return CreatedAtAction("GetPessoas", new { id = pessoas.Id }, pessoas);
         }
 
+        // DELETE: api/Pessoas/5
         [HttpDelete("{id}")]
-        public async Task<ActionResult<Pessoa>> DeletePessoa(int id)
+        public async Task<ActionResult<Pessoas>> DeletePessoas(int id)
         {
-            var pessoa = await _context.Pessoas.FindAsync(id);
-            if (pessoa == null)
+            var pessoas = await _context.Pessoas.FindAsync(id);
+            if (pessoas == null)
             {
                 return NotFound();
             }
 
-            _context.Pessoas.Remove(pessoa);
+            _context.Pessoas.Remove(pessoas);
             await _context.SaveChangesAsync();
 
-            return pessoa;
+            return pessoas;
         }
 
-        private bool PessoaExists(int id)
+        private bool PessoasExists(int id)
         {
-            return _context.Pessoas.Any(e => e.id == id);
+            return _context.Pessoas.Any(e => e.Id == id);
         }
     }
 }
