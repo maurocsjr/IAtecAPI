@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using IAtecAPI.Models;
+using System.Security.Cryptography.X509Certificates;
 
 namespace IAtecAPI.Controllers
 {
@@ -20,7 +21,6 @@ namespace IAtecAPI.Controllers
             _context = context;
         }
 
-        // GET: api/Pessoas
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Pessoas>>> GetPessoas()
         {
@@ -50,7 +50,6 @@ namespace IAtecAPI.Controllers
             return pessoas;
         }
 
-        // GET: api/Pessoas/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Pessoas>> GetPessoas(int id)
         {
@@ -64,9 +63,6 @@ namespace IAtecAPI.Controllers
             return pessoas;
         }
 
-        // PUT: api/Pessoas/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPut("{id}")]
         public async Task<IActionResult> PutPessoas(int id, Pessoas pessoas)
         {
@@ -75,7 +71,46 @@ namespace IAtecAPI.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(pessoas).State = EntityState.Modified;
+
+            var pessoa = _context.Pessoas
+                .Where(p => p.Id == pessoas.Id)
+                .Include(p => p.Telefones)
+                .SingleOrDefault();
+
+            if (pessoa != null)
+            {
+                // Update parent
+                _context.Entry(pessoa).CurrentValues.SetValues(pessoas);
+
+                // Delete children
+                foreach (var existingChild in pessoa.Telefones.ToList())
+                {
+                    if (!pessoas.Telefones.Any(c => c.Id == existingChild.Id))
+                        _context.Telefones.Remove(existingChild);
+                }
+
+                foreach (var childModel in pessoas.Telefones)
+                {
+                    var existingChild = pessoa.Telefones
+                        .Where(c => c.Id == childModel.Id)
+                        .SingleOrDefault();
+
+                    if (existingChild != null)
+                        // Update child
+                        _context.Entry(existingChild).CurrentValues.SetValues(childModel);
+                    else
+                    {
+                        // Insert child
+                        var newChild = new Telefones
+                        {
+                            IdPessoa = childModel.IdPessoa,
+                            IdPessoaNavigation = childModel.IdPessoaNavigation,
+                            Telefone = childModel.Telefone
+                        };
+                        pessoa.Telefones.Add(newChild);
+                    }
+                }
+            }
 
             try
             {
@@ -96,9 +131,6 @@ namespace IAtecAPI.Controllers
             return NoContent();
         }
 
-        // POST: api/Pessoas
-        // To protect from overposting attacks, enable the specific properties you want to bind to, for
-        // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPost]
         public async Task<ActionResult<Pessoas>> PostPessoas(Pessoas pessoas)
         {
@@ -108,7 +140,6 @@ namespace IAtecAPI.Controllers
             return CreatedAtAction("GetPessoas", new { id = pessoas.Id }, pessoas);
         }
 
-        // DELETE: api/Pessoas/5
         [HttpDelete("{id}")]
         public async Task<ActionResult<Pessoas>> DeletePessoas(int id)
         {
